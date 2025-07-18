@@ -1,0 +1,57 @@
+services:
+  - name: "frontend-service"
+    domainName: "app.example.com"
+    contextPath: "/"
+    protocol: "HTTP"
+    port: 80
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/frontend:latest"
+    taskSize:
+      cpu: 256
+      memory: 512
+    scaling:
+      minCapacity: 2
+      maxCapacity: 10
+      targetCpuUtilization: 70
+    environmentVariables:
+      NODE_ENV: "production"
+      API_BASE_URL: "https://api.example.com"
+    healthCheck:
+      path: "/health"
+      interval: 30
+      timeout: 5
+      retries: 3
+    deployment:
+      type: "blue-green"
+  
+  - name: "backend-service"
+    domainName: "backend.example.com"
+    contextPath: "/api"
+    protocol: "HTTP"
+    port: 8080
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/backend:latest"
+    taskSize:
+      cpu: 512
+      memory: 1024
+    scaling:
+      minCapacity: 3
+      maxCapacity: 15
+      targetCpuUtilization: 65
+      targetMemoryUtilization: 75
+    environmentVariables:
+      SPRING_PROFILES_ACTIVE: "production"
+      DATABASE_URL: "postgresql://user:pass@db.example.com:5432/backend"
+    healthCheck:
+      path: "/api/health"
+      interval: 20
+      timeout: 8
+      retries: 3
+      gracePeriod: 120
+    deployment:
+      type: "canary"
+      canaryPercentage: 15
+    sidecarContainers:
+      - name: "log-router"
+        image: "fluent/fluent-bit:latest"
+        essential: false
+        cpu: 64
+        memory: 128

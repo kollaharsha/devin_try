@@ -1,0 +1,29 @@
+name: "grpc-service"
+domainName: "grpc.example.com"
+contextPath: "/"
+protocol: "gRPC"
+port: 9090
+containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/grpc-service:latest"
+taskSize:
+  cpu: 1024
+  memory: 2048
+scaling:
+  minCapacity: 2
+  maxCapacity: 20
+  targetCpuUtilization: 60
+  targetMemoryUtilization: 70
+environmentVariables:
+  GRPC_PORT: "9090"
+  DATABASE_URL: "postgresql://user:pass@db.example.com:5432/grpcdb"
+healthCheck:
+  path: "/grpc.health.v1.Health/Check"
+  interval: 15
+  timeout: 10
+  retries: 2
+  gracePeriod: 90
+security:
+  mTLS: true
+deployment:
+  type: "canary"
+  canaryPercentage: 20
+  terminationWaitTime: 600

@@ -1,0 +1,37 @@
+name: "api-service"
+domainName: "api.example.com"
+contextPath: "/api/v1"
+protocol: "HTTP"
+port: 8080
+containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/api-service:latest"
+taskSize:
+  cpu: 512
+  memory: 1024
+scaling:
+  minCapacity: 2
+  maxCapacity: 10
+  targetCpuUtilization: 70
+  targetMemoryUtilization: 80
+environmentVariables:
+  NODE_ENV: "production"
+  DATABASE_URL: "postgresql://user:pass@db.example.com:5432/mydb"
+  REDIS_URL: "redis://redis.example.com:6379"
+healthCheck:
+  path: "/health"
+  interval: 30
+  timeout: 5
+  retries: 3
+  gracePeriod: 60
+security:
+  mTLS: false
+deployment:
+  type: "blue-green"
+  terminationWaitTime: 300
+sidecarContainers:
+  - name: "logging-agent"
+    image: "fluent/fluent-bit:latest"
+    essential: false
+    cpu: 64
+    memory: 128
+    environmentVariables:
+      LOG_LEVEL: "info"

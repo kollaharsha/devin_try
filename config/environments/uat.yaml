@@ -1,0 +1,12 @@
+name: uat
+primaryRegion: us-east-1
+secondaryRegion: us-east-2
+multiRegion: true
+vpcCidr: "10.2.0.0/16"
+availabilityZones:
+  - us-east-1a
+  - us-east-1b
+  - us-east-1c
+certificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+hostedZoneId: "Z1D633PJN98FT9"
+domainName: "uat.example.com"

@@ -1,0 +1,12 @@
+name: prod
+primaryRegion: us-east-1
+secondaryRegion: us-east-2
+multiRegion: true
+vpcCidr: "10.3.0.0/16"
+availabilityZones:
+  - us-east-1a
+  - us-east-1b
+  - us-east-1c
+certificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/87654321-4321-4321-4321-210987654321"
+hostedZoneId: "Z1D633PJN98FT9"
+domainName: "example.com"

@@ -1,0 +1,32 @@
+name: "worker-service"
+protocol: "HTTP"
+port: 3000
+containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/worker-service:latest"
+taskSize:
+  cpu: 256
+  memory: 512
+scaling:
+  minCapacity: 1
+  maxCapacity: 5
+  targetCpuUtilization: 80
+environmentVariables:
+  NODE_ENV: "production"
+  QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+  WORKER_CONCURRENCY: "5"
+healthCheck:
+  path: "/health"
+  interval: 30
+  timeout: 5
+  retries: 3
+  gracePeriod: 30
+deployment:
+  type: "rolling"
+sidecarContainers:
+  - name: "metrics-collector"
+    image: "prom/node-exporter:latest"
+    essential: false
+    cpu: 32
+    memory: 64
+    portMappings:
+      - containerPort: 9100
+        protocol: "TCP"

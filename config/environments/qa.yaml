@@ -1,0 +1,8 @@
+name: qa
+primaryRegion: us-east-1
+multiRegion: false
+vpcCidr: "10.1.0.0/16"
+availabilityZones:
+  - us-east-1a
+  - us-east-1b
+  - us-east-1c
