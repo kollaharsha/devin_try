@@ -2,17 +2,19 @@ import { ServiceConfig } from '../types/service-config';
 /**
  * Loads and validates a service configuration from a YAML file
  * @param configPath Path to the YAML configuration file
+ * @param envDefaults Optional environment-level defaults to merge
  * @returns Array of validated service configurations
  * @throws Error if file not found or validation fails
  */
-export declare function loadServiceConfig(configPath: string): ServiceConfig[];
+export declare function loadServiceConfig(configPath: string, envDefaults?: any): ServiceConfig[];
 /**
  * Loads all service configurations from a directory
  * @param servicesDir Directory containing YAML service configuration files
+ * @param envDefaults Optional environment-level defaults to merge
  * @returns Array of all validated service configurations
  * @throws Error if directory not found or any validation fails
  */
-export declare function loadAllServiceConfigs(servicesDir: string): ServiceConfig[];
+export declare function loadAllServiceConfigs(servicesDir: string, envDefaults?: any): ServiceConfig[];
 /**
  * Legacy function for backward compatibility
  * @deprecated Use loadAllServiceConfigs instead
