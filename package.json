@@ -7,11 +7,12 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
+    "validate": "ts-node scripts/validate-config.ts",
     "cdk": "cdk",
-    "deploy:dev": "cdk deploy --context environment=dev",
-    "deploy:qa": "cdk deploy --context environment=qa",
-    "deploy:uat": "cdk deploy --context environment=uat",
-    "deploy:prod": "cdk deploy --context environment=prod",
+    "deploy:dev": "npm run validate && cdk deploy --context environment=dev",
+    "deploy:qa": "npm run validate && cdk deploy --context environment=qa",
+    "deploy:uat": "npm run validate && cdk deploy --context environment=uat",
+    "deploy:prod": "npm run validate && cdk deploy --context environment=prod",
     "synth": "cdk synth",
     "diff": "cdk diff",
     "destroy": "cdk destroy"
@@ -19,16 +20,17 @@
   "devDependencies": {
     "@types/jest": "^29.4.0",
     "@types/node": "^18.14.6",
+    "aws-cdk": "2.87.0",
     "jest": "^29.5.0",
     "ts-jest": "^29.0.5",
-    "typescript": "~4.9.5",
-    "aws-cdk": "2.87.0"
+    "ts-node": "^10.9.2",
+    "typescript": "~4.9.5"
   },
   "dependencies": {
     "aws-cdk-lib": "2.87.0",
     "constructs": "^10.0.0",
-    "yaml": "^2.3.1",
-    "source-map-support": "^0.5.21"
+    "source-map-support": "^0.5.21",
+    "yaml": "^2.3.1"
   },
   "keywords": [
     "aws",

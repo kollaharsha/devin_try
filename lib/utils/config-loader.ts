@@ -1,110 +1,210 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
+import {
+  ServiceConfig,
+  ServiceConfigFile,
+  MultiServiceConfig,
+  isMultiServiceConfig,
+  isSingleServiceConfig,
+  validateServiceConfig,
+  ServiceConfigValidationError,
+  DEFAULT_SERVICE_CONFIG
+} from '../types/service-config';
 
-export interface TaskSize {
-  cpu: number;
-  memory: number;
+/**
+ * Loads and validates a service configuration from a YAML file
+ * @param configPath Path to the YAML configuration file
+ * @returns Array of validated service configurations
+ * @throws Error if file not found or validation fails
+ */
+export function loadServiceConfig(configPath: string): ServiceConfig[] {
+  const fullPath = path.resolve(configPath);
+  
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(`Service configuration file not found: ${fullPath}`);
+  }
+
+  try {
+    const fileContent = fs.readFileSync(fullPath, 'utf8');
+    const rawConfig = yaml.parse(fileContent) as ServiceConfigFile;
+
+    let services: ServiceConfig[];
+
+    if (isMultiServiceConfig(rawConfig)) {
+      services = rawConfig.services;
+    } else if (isSingleServiceConfig(rawConfig)) {
+      services = [rawConfig];
+    } else {
+      throw new Error(`Invalid configuration format in ${configPath}. Must contain either a single service or a 'services' array.`);
+    }
+
+    const validatedServices: ServiceConfig[] = [];
+    for (const [index, service] of services.entries()) {
+      try {
+        const serviceWithDefaults = applyDefaults(service);
+        validateServiceConfig(serviceWithDefaults);
+        validatedServices.push(serviceWithDefaults);
+      } catch (error) {
+        if (error instanceof ServiceConfigValidationError) {
+          throw new Error(`Validation error in ${configPath} (service ${index + 1}): ${error.message}`);
+        }
+        throw error;
+      }
+    }
+
+    return validatedServices;
+  } catch (error) {
+    if (error instanceof yaml.YAMLParseError) {
+      throw new Error(`YAML parsing error in ${configPath}: ${error.message}`);
+    }
+    throw error;
+  }
 }
 
-export interface ScalingConfig {
-  minCapacity: number;
-  maxCapacity: number;
-  targetCpuUtilization?: number;
-  targetMemoryUtilization?: number;
+/**
+ * Loads all service configurations from a directory
+ * @param servicesDir Directory containing YAML service configuration files
+ * @returns Array of all validated service configurations
+ * @throws Error if directory not found or any validation fails
+ */
+export function loadAllServiceConfigs(servicesDir: string): ServiceConfig[] {
+  const fullPath = path.resolve(servicesDir);
+  
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(`Services directory not found: ${fullPath}`);
+  }
+
+  const serviceConfigs: ServiceConfig[] = [];
+  const files = fs.readdirSync(fullPath);
+  const yamlFiles = files.filter(file => file.endsWith('.yaml') || file.endsWith('.yml'));
+
+  if (yamlFiles.length === 0) {
+    console.warn(`No YAML files found in services directory: ${fullPath}`);
+    return serviceConfigs;
+  }
+
+  for (const file of yamlFiles) {
+    try {
+      const filePath = path.join(fullPath, file);
+      const configs = loadServiceConfig(filePath);
+      serviceConfigs.push(...configs);
+    } catch (error) {
+      throw new Error(`Failed to load service configuration from ${file}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  const serviceNames = new Set<string>();
+  for (const config of serviceConfigs) {
+    if (serviceNames.has(config.name)) {
+      throw new Error(`Duplicate service name found: ${config.name}. Service names must be unique across all configuration files.`);
+    }
+    serviceNames.add(config.name);
+  }
+
+  return serviceConfigs;
 }
 
-export interface HealthCheckConfig {
-  path: string;
-  interval: number;
-  timeout: number;
-  retries: number;
-  gracePeriod?: number;
-}
-
-export interface SecurityConfig {
-  mTLS?: boolean;
-  certificateArn?: string;
-}
-
-export interface DeploymentConfig {
-  type: 'rolling' | 'blue-green' | 'canary';
-  canaryPercentage?: number;
-  terminationWaitTime?: number;
-}
-
-export interface SidecarContainer {
-  name: string;
-  image: string;
-  essential: boolean;
-  cpu?: number;
-  memory?: number;
-  environmentVariables?: Record<string, string>;
-  portMappings?: Array<{
-    containerPort: number;
-    protocol?: string;
-  }>;
-}
-
-export interface ServiceConfig {
-  name: string;
-  domainName?: string;
-  contextPath?: string;
-  protocol: 'HTTP' | 'gRPC';
-  port: number;
-  containerImage: string;
-  taskSize: TaskSize;
-  scaling: ScalingConfig;
-  environmentVariables?: Record<string, string>;
-  healthCheck: HealthCheckConfig;
-  security?: SecurityConfig;
-  deployment?: DeploymentConfig;
-  sidecarContainers?: SidecarContainer[];
-}
-
-export interface ServicesConfig {
-  services: ServiceConfig[];
-}
-
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use loadAllServiceConfigs instead
+ */
 export function loadServiceConfigs(): ServiceConfig[] {
   const servicesDir = path.join(__dirname, '../../config/services');
-  const services: ServiceConfig[] = [];
-
-  if (!fs.existsSync(servicesDir)) {
-    throw new Error(`Services directory not found: ${servicesDir}`);
-  }
-
-  const files = fs.readdirSync(servicesDir).filter(file => file.endsWith('.yaml') || file.endsWith('.yml'));
-
-  for (const file of files) {
-    const filePath = path.join(servicesDir, file);
-    const content = fs.readFileSync(filePath, 'utf8');
-    const config = yaml.parse(content);
-
-    if (config.services && Array.isArray(config.services)) {
-      services.push(...config.services);
-    } else {
-      services.push(config as ServiceConfig);
-    }
-  }
-
-  return services;
+  return loadAllServiceConfigs(servicesDir);
 }
 
-export function validateServiceConfig(config: ServiceConfig): void {
-  const required = ['name', 'protocol', 'port', 'containerImage', 'taskSize', 'scaling', 'healthCheck'];
+/**
+ * Applies default values to a service configuration
+ * @param config Partial service configuration
+ * @returns Complete service configuration with defaults applied
+ */
+function applyDefaults(config: ServiceConfig): ServiceConfig {
+  return {
+    ...DEFAULT_SERVICE_CONFIG,
+    ...config,
+    taskSize: {
+      ...DEFAULT_SERVICE_CONFIG.taskSize!,
+      ...config.taskSize
+    },
+    scaling: {
+      ...DEFAULT_SERVICE_CONFIG.scaling!,
+      ...config.scaling
+    },
+    healthCheck: {
+      ...DEFAULT_SERVICE_CONFIG.healthCheck!,
+      ...config.healthCheck
+    },
+    security: {
+      ...DEFAULT_SERVICE_CONFIG.security!,
+      ...config.security
+    },
+    deployment: {
+      ...DEFAULT_SERVICE_CONFIG.deployment!,
+      ...config.deployment
+    }
+  };
+}
+
+/**
+ * Validates a service configuration file without loading it
+ * Useful for CI/CD pipelines or configuration validation tools
+ * @param configPath Path to the YAML configuration file
+ * @returns Validation result with any errors
+ */
+export function validateServiceConfigFile(configPath: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
   
-  for (const field of required) {
-    if (!config[field as keyof ServiceConfig]) {
-      throw new Error(`Missing required field '${field}' in service config for ${config.name}`);
-    }
-  }
-
-  if (!['HTTP', 'gRPC'].includes(config.protocol)) {
-    throw new Error(`Invalid protocol '${config.protocol}' for service ${config.name}. Must be HTTP or gRPC`);
-  }
-
-  if (config.deployment?.type && !['rolling', 'blue-green', 'canary'].includes(config.deployment.type)) {
-    throw new Error(`Invalid deployment type '${config.deployment.type}' for service ${config.name}`);
+  try {
+    loadServiceConfig(configPath);
+    return { valid: true, errors: [] };
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+    return { valid: false, errors };
   }
 }
+
+/**
+ * Gets a service configuration by name from a list of configurations
+ * @param configs Array of service configurations
+ * @param serviceName Name of the service to find
+ * @returns Service configuration if found, undefined otherwise
+ */
+export function getServiceByName(configs: ServiceConfig[], serviceName: string): ServiceConfig | undefined {
+  return configs.find(config => config.name === serviceName);
+}
+
+/**
+ * Filters service configurations by protocol
+ * @param configs Array of service configurations
+ * @param protocol Protocol to filter by
+ * @returns Array of service configurations matching the protocol
+ */
+export function getServicesByProtocol(configs: ServiceConfig[], protocol: 'HTTP' | 'gRPC'): ServiceConfig[] {
+  return configs.filter(config => config.protocol === protocol);
+}
+
+/**
+ * Gets services that require load balancers (have domainName configured)
+ * @param configs Array of service configurations
+ * @returns Array of service configurations that need load balancers
+ */
+export function getServicesWithLoadBalancer(configs: ServiceConfig[]): ServiceConfig[] {
+  return configs.filter(config => config.domainName);
+}
+
+export {
+  ServiceConfig,
+  ServiceConfigFile,
+  MultiServiceConfig,
+  TaskSize,
+  ScalingConfig,
+  HealthCheck,
+  SecurityConfig,
+  DeploymentConfig,
+  SidecarContainer,
+  PortMapping,
+  Protocol,
+  DeploymentType,
+  ContainerProtocol
+} from '../types/service-config';

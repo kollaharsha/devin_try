@@ -1,9 +1,11 @@
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as path from 'path';
 import { Construct } from 'constructs';
 import { EnvironmentConfig } from '../utils/environment';
-import { loadServiceConfigs, validateServiceConfig } from '../utils/config-loader';
+import { loadAllServiceConfigs } from '../utils/config-loader';
+import { validateServiceConfig } from '../types/service-config';
 import { EcsServiceConstruct } from '../constructs/ecs-service';
 
 export interface ServiceStackProps extends cdk.StackProps {
@@ -19,7 +21,7 @@ export class ServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ServiceStackProps) {
     super(scope, id, props);
 
-    const serviceConfigs = loadServiceConfigs();
+    const serviceConfigs = loadAllServiceConfigs(path.join(__dirname, '../../config/services'));
 
     for (const serviceConfig of serviceConfigs) {
       validateServiceConfig(serviceConfig);

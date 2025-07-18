@@ -2,7 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as applicationautoscaling from 'aws-cdk-lib/aws-applicationautoscaling';
 import { Construct } from 'constructs';
-import { ScalingConfig } from '../utils/config-loader';
+import { ScalingConfig } from '../types/service-config';
 
 export interface ScalingConstructProps {
   service: ecs.FargateService;

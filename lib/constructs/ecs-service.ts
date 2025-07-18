@@ -6,7 +6,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as applicationautoscaling from 'aws-cdk-lib/aws-applicationautoscaling';
 import { Construct } from 'constructs';
-import { ServiceConfig } from '../utils/config-loader';
+import { ServiceConfig } from '../types/service-config';
 import { EnvironmentConfig } from '../utils/environment';
 import { LoadBalancerConstruct } from './load-balancer';
 import { ScalingConstruct } from './scaling';

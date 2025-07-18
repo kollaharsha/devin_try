@@ -6,7 +6,7 @@ import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
-import { ServiceConfig } from '../utils/config-loader';
+import { ServiceConfig } from '../types/service-config';
 import { EnvironmentConfig } from '../utils/environment';
 
 export interface LoadBalancerConstructProps {
