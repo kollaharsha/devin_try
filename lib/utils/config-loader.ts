@@ -15,10 +15,11 @@ import {
 /**
  * Loads and validates a service configuration from a YAML file
  * @param configPath Path to the YAML configuration file
+ * @param envDefaults Optional environment-level defaults to merge
  * @returns Array of validated service configurations
  * @throws Error if file not found or validation fails
  */
-export function loadServiceConfig(configPath: string): ServiceConfig[] {
+export function loadServiceConfig(configPath: string, envDefaults?: any): ServiceConfig[] {
   const fullPath = path.resolve(configPath);
   
   if (!fs.existsSync(fullPath)) {
@@ -42,7 +43,7 @@ export function loadServiceConfig(configPath: string): ServiceConfig[] {
     const validatedServices: ServiceConfig[] = [];
     for (const [index, service] of services.entries()) {
       try {
-        const serviceWithDefaults = applyDefaults(service);
+        const serviceWithDefaults = applyDefaults(service, envDefaults);
         validateServiceConfig(serviceWithDefaults);
         validatedServices.push(serviceWithDefaults);
       } catch (error) {
@@ -65,10 +66,11 @@ export function loadServiceConfig(configPath: string): ServiceConfig[] {
 /**
  * Loads all service configurations from a directory
  * @param servicesDir Directory containing YAML service configuration files
+ * @param envDefaults Optional environment-level defaults to merge
  * @returns Array of all validated service configurations
  * @throws Error if directory not found or any validation fails
  */
-export function loadAllServiceConfigs(servicesDir: string): ServiceConfig[] {
+export function loadAllServiceConfigs(servicesDir: string, envDefaults?: any): ServiceConfig[] {
   const fullPath = path.resolve(servicesDir);
   
   if (!fs.existsSync(fullPath)) {
@@ -87,7 +89,7 @@ export function loadAllServiceConfigs(servicesDir: string): ServiceConfig[] {
   for (const file of yamlFiles) {
     try {
       const filePath = path.join(fullPath, file);
-      const configs = loadServiceConfig(filePath);
+      const configs = loadServiceConfig(filePath, envDefaults);
       serviceConfigs.push(...configs);
     } catch (error) {
       throw new Error(`Failed to load service configuration from ${file}: ${error instanceof Error ? error.message : String(error)}`);
@@ -117,18 +119,21 @@ export function loadServiceConfigs(): ServiceConfig[] {
 /**
  * Applies default values to a service configuration
  * @param config Partial service configuration
+ * @param envDefaults Optional environment-level defaults
  * @returns Complete service configuration with defaults applied
  */
-function applyDefaults(config: ServiceConfig): ServiceConfig {
-  return {
+function applyDefaults(config: ServiceConfig, envDefaults?: any): ServiceConfig {
+  const baseConfig = {
     ...DEFAULT_SERVICE_CONFIG,
     ...config,
     taskSize: {
       ...DEFAULT_SERVICE_CONFIG.taskSize!,
+      ...envDefaults?.taskSize,
       ...config.taskSize
     },
     scaling: {
       ...DEFAULT_SERVICE_CONFIG.scaling!,
+      ...envDefaults?.scaling,
       ...config.scaling
     },
     healthCheck: {
@@ -144,6 +149,26 @@ function applyDefaults(config: ServiceConfig): ServiceConfig {
       ...config.deployment
     }
   };
+
+  if (envDefaults?.environmentVariables || config.environmentVariables) {
+    baseConfig.environmentVariables = {
+      ...envDefaults?.environmentVariables || {},
+      ...config.environmentVariables || {}
+    };
+  }
+
+  if (envDefaults?.sidecarContainers || config.sidecarContainers) {
+    const envSidecars = envDefaults?.sidecarContainers || [];
+    const serviceSidecars = config.sidecarContainers || [];
+    
+    const sidecarMap = new Map();
+    [...envSidecars, ...serviceSidecars].forEach((sidecar: any) => {
+      sidecarMap.set(sidecar.name, sidecar);
+    });
+    baseConfig.sidecarContainers = Array.from(sidecarMap.values());
+  }
+
+  return baseConfig;
 }
 
 /**
