@@ -2,6 +2,32 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
 
+export interface CommonConfig {
+  environmentVariables?: Record<string, string>;
+  sidecarContainers?: Array<{
+    name: string;
+    image: string;
+    essential?: boolean;
+    cpu?: number;
+    memory?: number;
+    environmentVariables?: Record<string, string>;
+    portMappings?: Array<{
+      containerPort: number;
+      protocol: string;
+    }>;
+  }>;
+  taskSize?: {
+    cpu?: number;
+    memory?: number;
+  };
+  scaling?: {
+    minCapacity?: number;
+    maxCapacity?: number;
+    targetCpuUtilization?: number;
+    targetMemoryUtilization?: number;
+  };
+}
+
 export interface EnvironmentConfig {
   name: string;
   primaryRegion: string;
@@ -61,6 +87,20 @@ export interface EnvironmentConfig {
   };
 }
 
+/**
+ * Loads common configuration that applies across all environments
+ */
+export function loadCommonConfig(): CommonConfig {
+  const commonConfigPath = path.join(__dirname, '../../config/common.yaml');
+  
+  if (!fs.existsSync(commonConfigPath)) {
+    return {}; // Return empty config if common.yaml doesn't exist
+  }
+
+  const configContent = fs.readFileSync(commonConfigPath, 'utf8');
+  return yaml.parse(configContent) as CommonConfig;
+}
+
 export function loadEnvironmentConfig(environment: string): EnvironmentConfig {
   const configPath = path.join(__dirname, '../../config/environments', `${environment}.yaml`);
   
@@ -91,8 +131,8 @@ export function getRegions(envConfig: EnvironmentConfig): string[] {
 }
 
 /**
- * Gets environment-specific configuration for a given region
- * Merges environment defaults with region-specific overrides
+ * Gets merged configuration for a given environment and region
+ * Merges common config -> environment defaults -> region-specific overrides
  */
 export function getEnvironmentConfigForRegion(envConfig: EnvironmentConfig, region: string): {
   environmentVariables: Record<string, string>;
@@ -101,19 +141,22 @@ export function getEnvironmentConfigForRegion(envConfig: EnvironmentConfig, regi
   hostedZoneId?: string;
   domainName?: string;
 } {
-  const defaults = envConfig.defaults || {};
+  const commonConfig = loadCommonConfig();
+  const envDefaults = envConfig.defaults || {};
   const regionConfig = envConfig.regions?.[region] || {};
   
   const environmentVariables = {
-    ...defaults.environmentVariables || {},
+    ...commonConfig.environmentVariables || {},
+    ...envDefaults.environmentVariables || {},
     ...regionConfig.environmentVariables || {}
   };
   
-  const defaultSidecars = defaults.sidecarContainers || [];
+  const commonSidecars = commonConfig.sidecarContainers || [];
+  const envSidecars = envDefaults.sidecarContainers || [];
   const regionSidecars = regionConfig.sidecarContainers || [];
   
   const sidecarMap = new Map();
-  [...defaultSidecars, ...regionSidecars].forEach(sidecar => {
+  [...commonSidecars, ...envSidecars, ...regionSidecars].forEach(sidecar => {
     sidecarMap.set(sidecar.name, sidecar);
   });
   const sidecarContainers = Array.from(sidecarMap.values());
@@ -124,5 +167,41 @@ export function getEnvironmentConfigForRegion(envConfig: EnvironmentConfig, regi
     certificateArn: regionConfig.certificateArn || envConfig.certificateArn,
     hostedZoneId: regionConfig.hostedZoneId || envConfig.hostedZoneId,
     domainName: regionConfig.domainName || envConfig.domainName
+  };
+}
+
+/**
+ * Gets merged common and environment defaults (without region-specific overrides)
+ * Used for service configuration merging
+ */
+export function getMergedEnvironmentDefaults(envConfig: EnvironmentConfig): CommonConfig {
+  const commonConfig = loadCommonConfig();
+  const envDefaults = envConfig.defaults || {};
+  
+  const environmentVariables = {
+    ...commonConfig.environmentVariables || {},
+    ...envDefaults.environmentVariables || {}
+  };
+  
+  const commonSidecars = commonConfig.sidecarContainers || [];
+  const envSidecars = envDefaults.sidecarContainers || [];
+  
+  const sidecarMap = new Map();
+  [...commonSidecars, ...envSidecars].forEach(sidecar => {
+    sidecarMap.set(sidecar.name, sidecar);
+  });
+  const sidecarContainers = Array.from(sidecarMap.values());
+  
+  return {
+    environmentVariables,
+    sidecarContainers,
+    taskSize: {
+      ...commonConfig.taskSize || {},
+      ...envDefaults.taskSize || {}
+    },
+    scaling: {
+      ...commonConfig.scaling || {},
+      ...envDefaults.scaling || {}
+    }
   };
 }

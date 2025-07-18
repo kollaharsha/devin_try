@@ -1,59 +1,102 @@
 services:
-  - name: "frontend-service"
-    environments: ["dev", "qa", "uat", "prod"]  # Deploy to all environments
+  - name: "web-app"
+    environments: ["dev", "qa", "uat", "prod"]
     domainName: "app.example.com"
     contextPath: "/"
     protocol: "HTTP"
-    port: 80
-    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/frontend:latest"
+    port: 3000
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/web-app:latest"
+    
     taskSize:
-      cpu: 256
-      memory: 512
+      cpu: 1024
+      memory: 2048
+    
     scaling:
-      minCapacity: 2
-      maxCapacity: 10
-      targetCpuUtilization: 70
+      minCapacity: 3
+      maxCapacity: 20
+      targetCpuUtilization: 60
+    
     environmentVariables:
-      NODE_ENV: "production"
-      API_BASE_URL: "https://api.example.com"
+      SERVICE_TYPE: "frontend"
+      CACHE_TTL: "3600"
+      DATABASE_URL: "postgresql://user:pass@db.example.com:5432/webapp"
+    
     healthCheck:
       path: "/health"
+      interval: 15
+      timeout: 3
+      retries: 5
+      gracePeriod: 60
+    
+    security:
+      mTLS: true
+    
+    deployment:
+      type: "blue-green"
+      terminationWaitTime: 300
+    
+    sidecarContainers:
+      - name: "nginx-proxy"
+        image: "nginx:alpine"
+        essential: false
+        cpu: 128
+        memory: 256
+        portMappings:
+          - containerPort: 80
+            protocol: "TCP"
+
+  - name: "api-service"
+    environments: ["qa", "uat", "prod"]  # Skip dev environment
+    domainName: "api.example.com"
+    contextPath: "/api/v1"
+    protocol: "HTTP"
+    port: 8080
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/api-service:latest"
+    
+    environmentVariables:
+      SERVICE_TYPE: "api"
+      API_VERSION: "v1"
+      RATE_LIMIT: "1000"
+      DATABASE_URL: "postgresql://user:pass@db.example.com:5432/apidb"
+    
+    healthCheck:
+      path: "/api/v1/health"
       interval: 30
       timeout: 5
       retries: 3
-    deployment:
-      type: "blue-green"
-  
-  - name: "backend-service"
-    environments: ["qa", "uat", "prod"]  # Skip dev environment
-    domainName: "backend.example.com"
-    contextPath: "/api"
-    protocol: "HTTP"
-    port: 8080
-    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/backend:latest"
-    taskSize:
-      cpu: 512
-      memory: 1024
-    scaling:
-      minCapacity: 3
-      maxCapacity: 15
-      targetCpuUtilization: 65
-      targetMemoryUtilization: 75
-    environmentVariables:
-      SPRING_PROFILES_ACTIVE: "production"
-      DATABASE_URL: "postgresql://user:pass@db.example.com:5432/backend"
-    healthCheck:
-      path: "/api/health"
-      interval: 20
-      timeout: 8
-      retries: 3
-      gracePeriod: 120
+      gracePeriod: 30
+    
     deployment:
       type: "canary"
-      canaryPercentage: 15
-    sidecarContainers:
-      - name: "log-router"
-        image: "fluent/fluent-bit:latest"
-        essential: false
-        cpu: 64
-        memory: 128
+      canaryPercentage: 25
+
+  - name: "background-processor"
+    environments: ["dev", "qa", "uat", "prod"]
+    protocol: "HTTP"
+    port: 3001
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/processor:latest"
+    
+    taskSize:
+      cpu: 2048
+      memory: 4096
+    
+    scaling:
+      minCapacity: 1
+      maxCapacity: 5
+      targetCpuUtilization: 85
+    
+    environmentVariables:
+      SERVICE_TYPE: "worker"
+      QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/123456789012/processing-queue"
+      BATCH_SIZE: "50"
+      WORKER_THREADS: "4"
+    
+    healthCheck:
+      path: "/health"
+      interval: 120
+      timeout: 10
+      retries: 2
+      gracePeriod: 180
+    
+    deployment:
+      type: "rolling"
