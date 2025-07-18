@@ -1,0 +1,93 @@
+services:
+  - name: "user-service"
+    environments: ["dev", "qa", "uat", "prod"]
+    domainName: "users.example.com"
+    contextPath: "/api/v1"
+    protocol: "HTTP"
+    port: 8080
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/user-service:latest"
+    
+    taskSize:
+      cpu: 512
+      memory: 1024
+    
+    scaling:
+      minCapacity: 2
+      maxCapacity: 10
+      targetCpuUtilization: 70
+    
+    environmentVariables:
+      SERVICE_TYPE: "api"
+      API_VERSION: "v1"
+    
+    healthCheck:
+      path: "/api/v1/health"
+      interval: 30
+      timeout: 5
+      retries: 3
+    
+    dynamodb:
+      tables:
+        - tableName: "users"
+          partitionKey:
+            name: "userId"
+            type: "S"
+          sortKey:
+            name: "createdAt"
+            type: "N"
+          billingMode: "PAY_PER_REQUEST"
+          pointInTimeRecovery: true
+          globalTable:
+            enabled: true
+          streams:
+            enabled: true
+            viewType: "NEW_AND_OLD_IMAGES"
+          globalSecondaryIndexes:
+            - indexName: "email-index"
+              partitionKey:
+                name: "email"
+                type: "S"
+              projectionType: "ALL"
+        
+        - tableName: "user-sessions"
+          partitionKey:
+            name: "sessionId"
+            type: "S"
+          billingMode: "PAY_PER_REQUEST"
+          pointInTimeRecovery: false
+
+  - name: "notification-service"
+    environments: ["dev", "qa", "uat", "prod"]
+    protocol: "HTTP"
+    port: 8081
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/notification-service:latest"
+    
+    taskSize:
+      cpu: 256
+      memory: 512
+    
+    scaling:
+      minCapacity: 1
+      maxCapacity: 5
+      targetCpuUtilization: 80
+    
+    environmentVariables:
+      SERVICE_TYPE: "worker"
+    
+    healthCheck:
+      path: "/health"
+      interval: 60
+      timeout: 10
+      retries: 2
+    
+    dynamodb:
+      accessTables:
+        - tableName: "users"
+          permissions: ["read"]
+          indexes: ["email-index"]
+      streamConsumers:
+        - sourceTableName: "users"
+          consumer:
+            batchSize: 5
+            startingPosition: "LATEST"
+            maxBatchingWindow: 10

@@ -10,6 +10,7 @@ import { ServiceConfig } from '../types/service-config';
 import { EnvironmentConfig } from '../utils/environment';
 import { LoadBalancerConstruct } from './load-balancer';
 import { ScalingConstruct } from './scaling';
+import { DynamoDBConstruct } from './dynamodb';
 
 export interface EcsServiceConstructProps {
   serviceConfig: ServiceConfig;
@@ -24,6 +25,7 @@ export class EcsServiceConstruct extends Construct {
   public readonly taskDefinition: ecs.FargateTaskDefinition;
   public readonly loadBalancer?: elbv2.ApplicationLoadBalancer;
   public readonly targetGroup?: elbv2.ApplicationTargetGroup;
+  public readonly dynamodbConstruct?: DynamoDBConstruct;
 
   constructor(scope: Construct, id: string, props: EcsServiceConstructProps) {
     super(scope, id);
@@ -136,6 +138,16 @@ export class EcsServiceConstruct extends Construct {
       service: this.service,
       scalingConfig: serviceConfig.scaling,
     });
+
+    if (serviceConfig.dynamodb) {
+      this.dynamodbConstruct = new DynamoDBConstruct(this, 'DynamoDB', {
+        dynamodbConfig: serviceConfig.dynamodb,
+        serviceName: serviceConfig.name,
+        environment,
+        envConfig,
+        taskRole,
+      });
+    }
 
     if (serviceConfig.deployment?.type === 'blue-green') {
       this.service.node.addMetadata('deploymentType', 'blue-green');

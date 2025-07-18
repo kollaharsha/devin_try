@@ -119,6 +119,129 @@ export interface DeploymentConfig {
 }
 
 /**
+ * DynamoDB table configuration
+ */
+export interface DynamoDBTableConfig {
+  /** Table name */
+  tableName: string;
+  
+  /** Partition key configuration */
+  partitionKey: {
+    name: string;
+    type: 'S' | 'N' | 'B'; // String, Number, Binary
+  };
+  
+  /** Sort key configuration (optional) */
+  sortKey?: {
+    name: string;
+    type: 'S' | 'N' | 'B';
+  };
+  
+  /** Billing mode */
+  billingMode?: 'PAY_PER_REQUEST' | 'PROVISIONED';
+  
+  /** Read capacity units (for PROVISIONED billing mode) */
+  readCapacity?: number;
+  
+  /** Write capacity units (for PROVISIONED billing mode) */
+  writeCapacity?: number;
+  
+  /** Enable point-in-time recovery */
+  pointInTimeRecovery?: boolean;
+  
+  /** Global table configuration for multi-region strong consistency */
+  globalTable?: {
+    /** Enable global tables with MRSC */
+    enabled: boolean;
+    /** Regions where the table should be replicated */
+    regions?: string[];
+  };
+  
+  /** DynamoDB streams configuration */
+  streams?: {
+    /** Enable DynamoDB streams */
+    enabled: boolean;
+    /** Stream view type */
+    viewType?: 'KEYS_ONLY' | 'NEW_IMAGE' | 'OLD_IMAGE' | 'NEW_AND_OLD_IMAGES';
+  };
+  
+  /** Global Secondary Indexes */
+  globalSecondaryIndexes?: Array<{
+    indexName: string;
+    partitionKey: {
+      name: string;
+      type: 'S' | 'N' | 'B';
+    };
+    sortKey?: {
+      name: string;
+      type: 'S' | 'N' | 'B';
+    };
+    projectionType?: 'ALL' | 'KEYS_ONLY' | 'INCLUDE';
+    nonKeyAttributes?: string[];
+    readCapacity?: number;
+    writeCapacity?: number;
+  }>;
+  
+  /** Local Secondary Indexes */
+  localSecondaryIndexes?: Array<{
+    indexName: string;
+    sortKey: {
+      name: string;
+      type: 'S' | 'N' | 'B';
+    };
+    projectionType?: 'ALL' | 'KEYS_ONLY' | 'INCLUDE';
+    nonKeyAttributes?: string[];
+  }>;
+}
+
+/**
+ * DynamoDB stream consumer configuration
+ */
+export interface DynamoDBStreamConsumerConfig {
+  /** Source table name to consume streams from */
+  sourceTableName: string;
+  
+  /** Consumer function configuration */
+  consumer: {
+    /** Handler function name or path */
+    handler?: string;
+    /** Batch size for stream processing */
+    batchSize?: number;
+    /** Maximum batching window in seconds */
+    maxBatchingWindow?: number;
+    /** Starting position for stream reading */
+    startingPosition?: 'TRIM_HORIZON' | 'LATEST';
+    /** Parallelization factor */
+    parallelizationFactor?: number;
+    /** Maximum record age in seconds */
+    maxRecordAge?: number;
+    /** Retry attempts */
+    retryAttempts?: number;
+  };
+}
+
+/**
+ * DynamoDB configuration for services
+ */
+export interface DynamoDBConfig {
+  /** DynamoDB tables that this service owns/creates */
+  tables?: DynamoDBTableConfig[];
+  
+  /** DynamoDB tables that this service needs access to (read/write permissions) */
+  accessTables?: Array<{
+    /** Table name to access */
+    tableName: string;
+    /** Access permissions */
+    permissions: ('read' | 'write' | 'delete')[];
+    /** Optional: specific indexes to access */
+    indexes?: string[];
+  }>;
+  
+  /** DynamoDB stream consumers for this service */
+  streamConsumers?: DynamoDBStreamConsumerConfig[];
+}
+
+/**
  * Complete service configuration schema
  * This represents the structure of a service YAML configuration file
  */
@@ -174,6 +297,9 @@ export interface ServiceConfig {
   
   /** Sidecar containers configuration */
   sidecarContainers?: SidecarContainer[];
+  
+  /** DynamoDB configuration */
+  dynamodb?: DynamoDBConfig;
 }
 
 /**
@@ -337,6 +463,98 @@ export function validateServiceConfig(config: ServiceConfig): void {
               `sidecarContainers[${index}].portMappings[${portIndex}].containerPort`
             );
           }
+        }
+      }
+    }
+  }
+
+  // Validate DynamoDB configuration
+  if (config.dynamodb) {
+    if (config.dynamodb.tables) {
+      for (const [index, table] of config.dynamodb.tables.entries()) {
+        if (!table.tableName || typeof table.tableName !== 'string') {
+          throw new ServiceConfigValidationError(`DynamoDB table at index ${index} must have a tableName`, `dynamodb.tables[${index}].tableName`);
+        }
+
+        if (!table.partitionKey || !table.partitionKey.name || !table.partitionKey.type) {
+          throw new ServiceConfigValidationError(`DynamoDB table at index ${index} must have a valid partitionKey`, `dynamodb.tables[${index}].partitionKey`);
+        }
+
+        if (table.partitionKey.type && !['S', 'N', 'B'].includes(table.partitionKey.type)) {
+          throw new ServiceConfigValidationError(`DynamoDB table at index ${index} partitionKey type must be S, N, or B`, `dynamodb.tables[${index}].partitionKey.type`);
+        }
+
+        if (table.sortKey && (!table.sortKey.name || !table.sortKey.type)) {
+          throw new ServiceConfigValidationError(`DynamoDB table at index ${index} sortKey must have name and type`, `dynamodb.tables[${index}].sortKey`);
+        }
+
+        if (table.sortKey && table.sortKey.type && !['S', 'N', 'B'].includes(table.sortKey.type)) {
+          throw new ServiceConfigValidationError(`DynamoDB table at index ${index} sortKey type must be S, N, or B`, `dynamodb.tables[${index}].sortKey.type`);
+        }
+
+        if (table.billingMode === 'PROVISIONED') {
+          if (!table.readCapacity || table.readCapacity < 1) {
+            throw new ServiceConfigValidationError(`DynamoDB table at index ${index} with PROVISIONED billing must have readCapacity >= 1`, `dynamodb.tables[${index}].readCapacity`);
+          }
+          if (!table.writeCapacity || table.writeCapacity < 1) {
+            throw new ServiceConfigValidationError(`DynamoDB table at index ${index} with PROVISIONED billing must have writeCapacity >= 1`, `dynamodb.tables[${index}].writeCapacity`);
+          }
+        }
+
+        if (table.globalSecondaryIndexes) {
+          for (const [gsiIndex, gsi] of table.globalSecondaryIndexes.entries()) {
+            if (!gsi.indexName || typeof gsi.indexName !== 'string') {
+              throw new ServiceConfigValidationError(`DynamoDB table at index ${index} GSI at index ${gsiIndex} must have an indexName`, `dynamodb.tables[${index}].globalSecondaryIndexes[${gsiIndex}].indexName`);
+            }
+            if (!gsi.partitionKey || !gsi.partitionKey.name || !gsi.partitionKey.type) {
+              throw new ServiceConfigValidationError(`DynamoDB table at index ${index} GSI at index ${gsiIndex} must have a valid partitionKey`, `dynamodb.tables[${index}].globalSecondaryIndexes[${gsiIndex}].partitionKey`);
+            }
+          }
+        }
+
+        if (table.localSecondaryIndexes) {
+          for (const [lsiIndex, lsi] of table.localSecondaryIndexes.entries()) {
+            if (!lsi.indexName || typeof lsi.indexName !== 'string') {
+              throw new ServiceConfigValidationError(`DynamoDB table at index ${index} LSI at index ${lsiIndex} must have an indexName`, `dynamodb.tables[${index}].localSecondaryIndexes[${lsiIndex}].indexName`);
+            }
+            if (!lsi.sortKey || !lsi.sortKey.name || !lsi.sortKey.type) {
+              throw new ServiceConfigValidationError(`DynamoDB table at index ${index} LSI at index ${lsiIndex} must have a valid sortKey`, `dynamodb.tables[${index}].localSecondaryIndexes[${lsiIndex}].sortKey`);
+            }
+          }
+        }
+      }
+    }
+
+    if (config.dynamodb.accessTables) {
+      for (const [index, accessTable] of config.dynamodb.accessTables.entries()) {
+        if (!accessTable.tableName || typeof accessTable.tableName !== 'string') {
+          throw new ServiceConfigValidationError(`DynamoDB access table at index ${index} must have a tableName`, `dynamodb.accessTables[${index}].tableName`);
+        }
+
+        if (!accessTable.permissions || accessTable.permissions.length === 0) {
+          throw new ServiceConfigValidationError(`DynamoDB access table at index ${index} must have at least one permission`, `dynamodb.accessTables[${index}].permissions`);
+        }
+
+        for (const permission of accessTable.permissions) {
+          if (!['read', 'write', 'delete'].includes(permission)) {
+            throw new ServiceConfigValidationError(`DynamoDB access table at index ${index} has invalid permission: ${permission}`, `dynamodb.accessTables[${index}].permissions`);
+          }
+        }
+      }
+    }
+
+    if (config.dynamodb.streamConsumers) {
+      for (const [index, consumer] of config.dynamodb.streamConsumers.entries()) {
+        if (!consumer.sourceTableName || typeof consumer.sourceTableName !== 'string') {
+          throw new ServiceConfigValidationError(`DynamoDB stream consumer at index ${index} must have a sourceTableName`, `dynamodb.streamConsumers[${index}].sourceTableName`);
+        }
+
+        if (consumer.consumer.startingPosition && !['TRIM_HORIZON', 'LATEST'].includes(consumer.consumer.startingPosition)) {
+          throw new ServiceConfigValidationError(`DynamoDB stream consumer at index ${index} startingPosition must be TRIM_HORIZON or LATEST`, `dynamodb.streamConsumers[${index}].consumer.startingPosition`);
+        }
+
+        if (consumer.consumer.batchSize && (consumer.consumer.batchSize < 1 || consumer.consumer.batchSize > 1000)) {
+          throw new ServiceConfigValidationError(`DynamoDB stream consumer at index ${index} batchSize must be between 1 and 1000`, `dynamodb.streamConsumers[${index}].consumer.batchSize`);
         }
       }
     }
