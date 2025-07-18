@@ -1,0 +1,25 @@
+services:
+  - name: "frontend-app"
+    environments: ["dev", "qa", "uat", "prod"]
+    domainName: "app.example.com"
+    contextPath: "/"
+    protocol: "HTTP"
+    port: 3000
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/frontend:latest"
+    
+  - name: "api-gateway"
+    environments: ["qa", "uat", "prod"]
+    domainName: "api.example.com"
+    contextPath: "/api"
+    protocol: "HTTP"
+    port: 8080
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/api-gateway:latest"
+    
+  - name: "background-worker"
+    environments: ["dev", "qa", "uat", "prod"]
+    protocol: "HTTP"
+    port: 3001
+    containerImage: "my-account.dkr.ecr.us-east-1.amazonaws.com/worker:latest"
+    healthCheck:
+      path: "/status"
+      interval: 60

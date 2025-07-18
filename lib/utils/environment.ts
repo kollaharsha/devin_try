@@ -2,6 +2,32 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
 
+export interface CommonConfig {
+  environmentVariables?: Record<string, string>;
+  sidecarContainers?: Array<{
+    name: string;
+    image: string;
+    essential?: boolean;
+    cpu?: number;
+    memory?: number;
+    environmentVariables?: Record<string, string>;
+    portMappings?: Array<{
+      containerPort: number;
+      protocol: string;
+    }>;
+  }>;
+  taskSize?: {
+    cpu?: number;
+    memory?: number;
+  };
+  scaling?: {
+    minCapacity?: number;
+    maxCapacity?: number;
+    targetCpuUtilization?: number;
+    targetMemoryUtilization?: number;
+  };
+}
+
 export interface EnvironmentConfig {
   name: string;
   primaryRegion: string;

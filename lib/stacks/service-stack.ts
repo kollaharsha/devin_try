@@ -3,7 +3,7 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as path from 'path';
 import { Construct } from 'constructs';
-import { EnvironmentConfig } from '../utils/environment';
+import { EnvironmentConfig, getMergedEnvironmentDefaults } from '../utils/environment';
 import { loadAllServiceConfigs } from '../utils/config-loader';
 import { validateServiceConfig } from '../types/service-config';
 import { EcsServiceConstruct } from '../constructs/ecs-service';
@@ -21,7 +21,8 @@ export class ServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ServiceStackProps) {
     super(scope, id, props);
 
-    const allServiceConfigs = loadAllServiceConfigs(path.join(__dirname, '../../config/services'));
+    const mergedDefaults = getMergedEnvironmentDefaults(props.envConfig);
+    const allServiceConfigs = loadAllServiceConfigs(path.join(__dirname, '../../config/services'), mergedDefaults);
     
     const serviceConfigs = allServiceConfigs.filter(config => {
       if (!config.environments || config.environments.length === 0) {

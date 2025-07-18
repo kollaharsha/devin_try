@@ -6,3 +6,18 @@ availabilityZones:
   - us-east-1a
   - us-east-1b
   - us-east-1c
+
+defaults:
+  environmentVariables:
+    NODE_ENV: "development"
+    LOG_LEVEL: "debug"
+    ENVIRONMENT: "dev"
+  
+  taskSize:
+    cpu: 256
+    memory: 512
+  
+  scaling:
+    minCapacity: 1
+    maxCapacity: 3
+    targetCpuUtilization: 80

@@ -1,0 +1,23 @@
+
+environmentVariables:
+  LOG_FORMAT: "json"
+  HEALTH_CHECK_PATH: "/health"
+  METRICS_PORT: "9090"
+
+sidecarContainers:
+  - name: "health-checker"
+    image: "alpine/curl:latest"
+    essential: false
+    cpu: 16
+    memory: 32
+    environmentVariables:
+      CHECK_INTERVAL: "30"
+
+taskSize:
+  cpu: 256
+  memory: 512
+
+scaling:
+  minCapacity: 1
+  maxCapacity: 5
+  targetCpuUtilization: 70
