@@ -1,5 +1,6 @@
 services:
   - name: "frontend-service"
+    environments: ["dev", "qa", "uat", "prod"]  # Deploy to all environments
     domainName: "app.example.com"
     contextPath: "/"
     protocol: "HTTP"
@@ -24,6 +25,7 @@ services:
       type: "blue-green"
   
   - name: "backend-service"
+    environments: ["qa", "uat", "prod"]  # Skip dev environment
     domainName: "backend.example.com"
     contextPath: "/api"
     protocol: "HTTP"

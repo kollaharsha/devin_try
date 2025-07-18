@@ -21,7 +21,22 @@ export class ServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ServiceStackProps) {
     super(scope, id, props);
 
-    const serviceConfigs = loadAllServiceConfigs(path.join(__dirname, '../../config/services'));
+    const allServiceConfigs = loadAllServiceConfigs(path.join(__dirname, '../../config/services'));
+    
+    const serviceConfigs = allServiceConfigs.filter(config => {
+      if (!config.environments || config.environments.length === 0) {
+        return true;
+      }
+      return config.environments.includes(props.environment);
+    });
+
+    console.log(`Deploying ${serviceConfigs.length} services to ${props.environment} environment`);
+    if (allServiceConfigs.length > serviceConfigs.length) {
+      const skippedServices = allServiceConfigs
+        .filter(config => config.environments && !config.environments.includes(props.environment))
+        .map(config => config.name);
+      console.log(`Skipping services not configured for ${props.environment}: ${skippedServices.join(', ')}`);
+    }
 
     for (const serviceConfig of serviceConfigs) {
       validateServiceConfig(serviceConfig);

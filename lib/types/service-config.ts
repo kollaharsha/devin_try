@@ -127,6 +127,13 @@ export interface ServiceConfig {
   name: string;
   
   /** 
+   * Environments where this service should be deployed
+   * If not specified, service will be deployed to all environments
+   * Example: ["dev", "qa"] to deploy only to dev and qa environments
+   */
+  environments?: string[];
+  
+  /** 
    * Domain name for the service (optional)
    * If provided, an Application Load Balancer will be created
    */

@@ -1,4 +1,5 @@
 name: "api-service"
+environments: ["dev", "qa", "uat", "prod"]  # Deploy to all environments
 domainName: "api.example.com"
 contextPath: "/api/v1"
 protocol: "HTTP"

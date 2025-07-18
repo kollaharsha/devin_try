@@ -1,4 +1,5 @@
 name: "grpc-service"
+environments: ["qa", "uat", "prod"]  # Skip dev environment for gRPC service
 domainName: "grpc.example.com"
 contextPath: "/"
 protocol: "gRPC"

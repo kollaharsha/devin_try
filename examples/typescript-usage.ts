@@ -20,6 +20,7 @@ import {
 
 const apiServiceConfig: ServiceConfig = {
   name: 'api-service',
+  environments: ['dev', 'qa', 'uat', 'prod'], // Deploy to all environments
   domainName: 'api.example.com',
   contextPath: '/api/v1',
   protocol: 'HTTP',
@@ -89,6 +90,7 @@ const grpcServiceConfig: ServiceConfig = {
 
 const workerServiceConfig: ServiceConfig = {
   name: 'worker-service',
+  environments: ['dev', 'qa'], // Only deploy to dev and qa
   protocol: 'HTTP',
   port: 3000,
   containerImage: 'my-account.dkr.ecr.us-east-1.amazonaws.com/worker-service:latest',
